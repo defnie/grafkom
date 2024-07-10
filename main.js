@@ -1,43 +1,38 @@
 import * as THREE from './build/three.module.js';
+import { OrbitControls } from './build/OrbitControls.js';
+import { DragControls } from './build/DragControls.js';
 import { GLTFLoader } from './build/GLTFLoader.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x000000);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-camera.position.set(0, 5, 10); // Adjusted camera position
+camera.position.set(4, 5, 11);
 
-// Variables for manual controls
-let isRotating = false;
-let isPanning = false;
-let mouseX = 0, mouseY = 0;
+let mood = 500;
+let unpack = false;
 
-document.addEventListener('mousedown', onMouseDown, false);
-document.addEventListener('mousemove', onMouseMove, false);
-document.addEventListener('mouseup', onMouseUp, false);
-document.addEventListener('keydown', onKeyDown, false);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.enablePan = true;
+controls.minDistance = 5;
+controls.maxDistance = 20;
+controls.minPolarAngle = 0.5;
+controls.maxPolarAngle = 1.5;
+controls.autoRotate = false;
+controls.target = new THREE.Vector3(0, 1, 0);
+controls.update();
 
-// Create a circle (target object)
-const circleGeometry = new THREE.CircleGeometry(0.1, 32);
-const circleMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const circle = new THREE.Mesh(circleGeometry, circleMaterial);
-scene.add(circle);
-
-const groundGeometry = new THREE.PlaneGeometry(20, 20, 32, 32);
+const groundGeometry = new THREE.PlaneGeometry(20, 20);
 groundGeometry.rotateX(-Math.PI / 2);
-const groundMaterial = new THREE.MeshStandardMaterial({
-  color: 0x555555,
-  side: THREE.DoubleSide
-});
+const groundMaterial = new THREE.MeshStandardMaterial({ color: 0x555555, side: THREE.DoubleSide });
 const groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
 groundMesh.castShadow = false;
 groundMesh.receiveShadow = true;
@@ -69,14 +64,7 @@ loaderRoom.load('roomFurnished.gltf', (gltf) => {
   const meshRoom = gltf.scene;
   meshRoom.traverse((child) => {
     if (child.isMesh) {
-      const originalMaterial = child.material;
-      child.material = new THREE.MeshStandardMaterial({
-        color: originalMaterial.color,
-        map: originalMaterial.map,
-        metalness: 0.2,
-        roughness: 0.8,
-      });
-      child.castShadow = false;
+      child.castShadow = true;
       child.receiveShadow = true;
       child.geometry.computeBoundingBox();
       child.userData.boundingBox = new THREE.Box3().setFromObject(child);
@@ -92,56 +80,37 @@ loaderRoom.load('roomFurnished.gltf', (gltf) => {
   document.getElementById('progress-container').style.display = 'none';
 });
 
-const loader = new GLTFLoader().setPath('public/trial/');
-loader.load('scene2.gltf', (gltf) => {
-  const mesh = gltf.scene;
-  mesh.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      child.geometry.computeBoundingBox();
-      child.userData.boundingBox = new THREE.Box3().setFromObject(child);
-      child.userData.id = 'weirdSphere';
-    }
-  });
-  mesh.position.set(-0.4, 0.2, 1.5);
-  scene.add(mesh);
-  mesh.scale.set(0.01, 0.01, 0.01);
-  objects.push(mesh);
-  document.getElementById('progress-container').style.display = 'none';
-});
+const gltfLoader = new GLTFLoader();
 
-const loader2 = new GLTFLoader().setPath('public/cup/');
-loader2.load('cup.gltf', (gltf) => {
-  const mesh2 = gltf.scene;
-  mesh2.position.set(-1, 2, 2);
-  mesh2.traverse((child) => {
-    if (child.isMesh) {
-      child.userData.id = 'cup';
-    }
-  });
-  scene.add(mesh2);
-  mesh2.scale.set(0.0020, 0.0020, 0.0020);
-  objects.push(mesh2);
-});
+const modelPaths = [
+  { path: 'public/trial/', file: 'scene2.gltf', position: [-0.4, 3.1, -0.5], scale: 0.003, id: 'scene2' },
+  { path: 'public/cup/', file: 'cup.gltf', position: [1.5, 1.5, -0.3], scale: 0.002, id: 'cup' },
+  { path: 'public/chocobox/', file: 'chocobox.gltf', position: [2.5, 1.55, 2.5], scale: 0.0002, id: 'chocobox' },
+  { path: 'public/album/', file: 'album.gltf', position: [3.3, 1.15, 2], scale: 0.003, id: 'album' },
+  { path: 'public/books/', file: 'book.gltf', position: [-2.4, 1.8, 2], scale: 0.006, id: 'books' },
+  { path: 'public/laptop/', file: 'laptop.gltf', position: [-2.0, 1.8, 2.9], scale: 0.003, id: 'laptop' },
+  { path: 'public/beaver/', file: 'beaver.gltf', position: [-2.8, 2.35, 4], scale: 0.001, id: 'beaver' },
+];
 
-const loaderTrophy = new GLTFLoader().setPath('public/trophy/');
-loaderTrophy.load('trophy.gltf', (gltf) => {
-  const meshTrophy = gltf.scene;
-  meshTrophy.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = true;
-      child.geometry.computeBoundingBox();
-      child.userData.boundingBox = new THREE.Box3().setFromObject(child);
-      child.userData.id = 'trophy';
-    }
+modelPaths.forEach(model => {
+  gltfLoader.setPath(model.path).load(model.file, (gltf) => {
+    const mesh = gltf.scene;
+    mesh.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        child.geometry.computeBoundingBox();
+        child.userData.boundingBox = new THREE.Box3().setFromObject(child);
+        child.userData.id = model.id;
+      }
+    });
+    mesh.position.set(...model.position);
+    mesh.scale.set(model.scale, model.scale, model.scale);
+    if (model.rotationY) mesh.rotation.y = model.rotationY;
+    scene.add(mesh);
+    objects.push(mesh);
+    document.getElementById('progress-container').style.display = 'none';
   });
-  meshTrophy.position.set(0, 1.2, -0.5);
-  meshTrophy.scale.set(0.002, 0.002, 0.002);
-  scene.add(meshTrophy);
-  objects.push(meshTrophy);
-  document.getElementById('progress-container').style.display = 'none';
 });
 
 window.addEventListener('resize', () => {
@@ -150,153 +119,280 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-function onMouseDown(event) {
-  event.preventDefault();
-  mouseX = event.clientX;
-  mouseY = event.clientY;
-  
-  if (event.button === 0) { // Left mouse button
-    isRotating = true;
-  } else if (event.button === 2) { // Right mouse button
-    isPanning = true;
-  }
-}
-
-function onMouseMove(event) {
-  if (isRotating) {
-    const deltaX = event.clientX - mouseX;
-    const deltaY = event.clientY - mouseY;
-
-    const rotationSpeed = 0.005;
-    camera.rotation.y += deltaX * rotationSpeed;
-    camera.rotation.x += deltaY * rotationSpeed;
-    
-    mouseX = event.clientX;
-    mouseY = event.clientY;
-  } else if (isPanning) {
-    const deltaX = event.clientX - mouseX;
-    const deltaY = event.clientY - mouseY;
-
-    const panSpeed = 0.005;
-    camera.position.x -= deltaX * panSpeed;
-    camera.position.y += deltaY * panSpeed;
-    
-    mouseX = event.clientX;
-    mouseY = event.clientY;
-  }
-}
-
-function onMouseUp(event) {
-  isRotating = false;
-  isPanning = false;
-}
-
-function onKeyDown(event) {
-  const moveSpeed = 0.2;
-  const rotationSpeed = 0.05;
-  
-  switch (event.key) {
-    case 'w':
-      moveCameraIfNoCollision(new THREE.Vector3(0, 0, -moveSpeed));
-      break;
-    case 's':
-      moveCameraIfNoCollision(new THREE.Vector3(0, 0, moveSpeed));
-      break;
-    case 'a':
-      moveCameraIfNoCollision(new THREE.Vector3(-moveSpeed, 0, 0));
-      break;
-    case 'd':
-      moveCameraIfNoCollision(new THREE.Vector3(moveSpeed, 0, 0));
-      break;
-    case 'q':
-      camera.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), rotationSpeed);
-      break;
-    case 'e':
-      camera.rotateOnWorldAxis(new THREE.Vector3(0, 0, 1), -rotationSpeed);
-      break;
-    case 'ArrowUp':
-      moveCameraIfNoCollision(new THREE.Vector3(0, moveSpeed, 0));
-      break;
-    case 'ArrowDown':
-      moveCameraIfNoCollision(new THREE.Vector3(0, -moveSpeed, 0));
-      break;
-  }
-}
-
-function moveCameraIfNoCollision(delta) {
-  const originalPosition = camera.position.clone();
-  camera.position.add(delta);
-
-  const raycaster = new THREE.Raycaster();
-  const directions = [
-    new THREE.Vector3(delta.x, 0, 0).normalize(),
-    new THREE.Vector3(0, delta.y, 0).normalize(),
-    new THREE.Vector3(0, 0, delta.z).normalize()
-  ];
-
-  let collision = false;
-
-  directions.forEach((direction) => {
-    raycaster.set(camera.position, direction);
-    const intersects = raycaster.intersectObjects(objects, true);
-
-    if (intersects.length > 0 && intersects[0].distance < delta.length()) {
-      collision = true;
-    }
-  });
-
-  if (collision) {
-    camera.position.copy(originalPosition);
-  }
-}
-
 function onDocumentMouseDown(event) {
   event.preventDefault();
-
-  const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
-
   mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
 
+  const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, camera);
-
   const intersects = raycaster.intersectObjects(objects, true);
 
   if (intersects.length > 0) {
-    const object = intersects[0].object;
-    showMessage(`Selected ${object.userData.id}.`);
-    changeLighting(object.userData.id);
+    if (selectedObject) {
+      selectedObject.material.emissive.setHex(selectedObject.currentHex); // Remove previous outline
+    }
+    selectedObject = intersects[0].object;
+    selectedObject.currentHex = selectedObject.material.emissive.getHex();
+    selectedObject.material.emissive.setHex(0xff0000); // Outline with red color
   }
 }
 
-function showMessage(message) {
-  const textBox = document.createElement('div');
-  textBox.style.position = 'absolute';
-  textBox.style.top = '10px';
-  textBox.style.left = '10px';
-  textBox.style.padding = '10px';
-  textBox.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-  textBox.style.color = '#ffffff';
-  textBox.textContent = message;
-  document.body.appendChild(textBox);
+function onDocumentKeyDown(event) {
+  if (event.key === 'p' && selectedObject) {
+    selectedObject.traverse((child) => {
+      if (child.isMesh) {
+        // Store the original material to revert back later if needed
+        if (!child.userData.originalMaterial) {
+          child.userData.originalMaterial = child.material.clone();
+        }
+
+        // Determine the glow color based on userData.id
+        let glowColor;
+        if (unpack === false) {
+          if (selectedObject.userData.id === 'cup' || selectedObject.userData.id === 'scene2' || selectedObject.userData.id === 'chocobox' || selectedObject.userData.id === 'laptop') {
+            glowColor = new THREE.Color(0x0000ff); // Blue
+          } else if (selectedObject.userData.id === 'books' || selectedObject.userData.id === 'album' || selectedObject.userData.id === 'beaver') {
+            glowColor = new THREE.Color(0xffffff); // White
+          }
+        } else {
+          glowColor = new THREE.Color(0xffd700); // Gold
+        }
+
+        // Create an emissive material
+        const emissiveMaterial = new THREE.MeshStandardMaterial({
+          color: child.material.color, // Use the original color
+          emissive: glowColor, // Set the emissive color
+          emissiveIntensity: 1, // Adjust intensity as needed
+          transparent: true,
+          opacity: 1, // Fully opaque
+          castShadow: true,
+          receiveShadow: true
+        });
+
+        // Apply the emissive material
+        child.material = emissiveMaterial;
+      }
+    });
+
+    changeLighting(selectedObject.userData.id); // Change lighting based on object ID, where the mood change with it
+    if (mood == 610 || mood >= 7000) {
+      showUnpackMessage();
+    } else if(mood<=300){
+      showGameOverMessage();
+    }else {
+      showTextBox(selectedObject)
+
+    }
+    selectedObject = null;
+
+  }
+  console.log('unpack: ' + unpack);
+  console.log('mood: ' + mood);
+
+
+
 }
+
+function showGameOverMessage() {
+  const gameOverMessageBox = document.createElement('div');
+  gameOverMessageBox.id = 'game-over-message-box';
+  gameOverMessageBox.style.position = 'absolute';
+  gameOverMessageBox.style.top = '50%';
+  gameOverMessageBox.style.left = '50%';
+  gameOverMessageBox.style.transform = 'translate(-50%, -50%)';
+  gameOverMessageBox.style.padding = '20px';
+  gameOverMessageBox.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+  gameOverMessageBox.style.color = 'blue'; // Text color in blue
+  gameOverMessageBox.style.border = '1px solid blue';
+  gameOverMessageBox.style.borderRadius = '5px';
+  gameOverMessageBox.style.fontSize = '50px';
+  gameOverMessageBox.style.width = '90%';
+  gameOverMessageBox.style.height = '90%';
+  gameOverMessageBox.style.display = 'flex';
+  gameOverMessageBox.style.justifyContent = 'center';
+  gameOverMessageBox.style.alignItems = 'center';
+  gameOverMessageBox.style.textAlign = 'center';
+  gameOverMessageBox.style.boxShadow = '0 0 20px blue';
+
+  gameOverMessageBox.innerText = ' "I decided to pack and left that day." \nYour character has died.\n\nTRY AGAIN?\n press "y" to try again.';
+
+  document.body.appendChild(gameOverMessageBox);
+
+  function handleGameOverResponse(event) {
+    if (event.key === 'y') { // Assuming 'y' key is pressed for yes
+      mood = 500; // Reset mood to 500
+      gameOverMessageBox.remove();
+      document.removeEventListener('keydown', handleGameOverResponse);
+    }
+  }
+
+  document.addEventListener('keydown', handleGameOverResponse);
+}
+
+
+function showUnpackMessage() {
+  const unpackMessageBox = document.createElement('div');
+  unpackMessageBox.id = 'unpack-message-box';
+  unpackMessageBox.style.position = 'absolute';
+  unpackMessageBox.style.top = '50%';
+  unpackMessageBox.style.left = '50%';
+  unpackMessageBox.style.transform = 'translate(-50%, -50%)';
+  unpackMessageBox.style.padding = '20px';
+  unpackMessageBox.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+  unpackMessageBox.style.color = 'yellow';
+  unpackMessageBox.style.border = '1px solid yellow';
+  unpackMessageBox.style.borderRadius = '5px';
+  unpackMessageBox.style.fontSize = '50px';
+  unpackMessageBox.style.width = '90%';
+  unpackMessageBox.style.height = '90%';
+  unpackMessageBox.style.display = 'flex';
+  unpackMessageBox.style.justifyContent = 'center';
+  unpackMessageBox.style.alignItems = 'center';
+  unpackMessageBox.style.textAlign = 'center';
+  unpackMessageBox.style.boxShadow = '0 0 20px yellow';
+
+  if(unpack==false){
+    unpackMessageBox.innerText = '"Maybe i shouldnt leave." \nYou decided to unpack';
+  }else if(unpack==true && mood>7000){
+    unpackMessageBox.innerText = 'You have unpacked';
+  }
+
+
+  document.body.appendChild(unpackMessageBox);
+
+  function removeUnpackMessage() {
+    unpackMessageBox.remove();
+    unpack = true; // Set unpack to true after showing the message
+    document.removeEventListener('mousedown', removeUnpackMessage);
+    document.removeEventListener('keydown', removeUnpackMessage);
+  }
+
+  document.addEventListener('mousedown', removeUnpackMessage);
+  document.addEventListener('keydown', removeUnpackMessage);
+}
+
+function showTextBox(object) {
+  const textBox = document.createElement('div');
+  textBox.id = 'info-box';
+  textBox.style.position = 'absolute';
+  textBox.style.top = '50%';
+  textBox.style.left = '50%';
+  textBox.style.transform = 'translate(-50%, -50%)';
+  textBox.style.padding = '10px';
+  textBox.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
+  textBox.style.color = '#fff';
+  textBox.style.border = '1px solid #fff';
+  textBox.style.borderRadius = '5px';
+  textBox.style.fontSize = '40px'; // Increase text size
+
+  let title = '';
+  let content = '';
+  let size = 'auto';
+  let imageSrc = '';
+
+  // Customize title, content, size, and image based on object id and unpack variable
+  switch (object.userData.id) {
+    case 'scene2':
+      title = 'Sphere from Dad';
+      content = unpack ? '"I am glad that I have something to remember dad by."' : '"A weird sphere dad got me when I was little.\nI was adamant on it just because it was pretty.\nHe is not here anymore...."';
+      break;
+    case 'cup':
+      title = 'Charlie\'s Cup';
+      content = unpack ? '"I should try to talk to her again."' : '"A cup Charlie gave me for my birthday. We don\'t really talk anymore."';
+      break;
+    case 'chocobox':
+      title = 'Chocolate Box';
+      content = unpack ? '"Maybe it\'s not too late to give it to him. I can make it again."' : '"Chocolate I made to give to Louis. I couldn\'t muster up the courage to give it to him."';
+      break;
+    case 'album':
+      title = 'University Photos';
+      content = unpack ? '"I will have new moments to be happy about."' : '"Photos of my times in university. I seemed to be happy in the photos."';
+      break;
+    case 'books':
+      title = 'Writing Books';
+      content = unpack ? '"I think I will try to write again."' : '"Books I used to write. Writing made me happy in the midst of all the stress."';
+      break;
+    case 'laptop':
+      title = 'Graduation Laptop';
+      content = unpack ? '"I am happy I managed to graduate."' : '"My laptop. My final grades aren\'t great."';
+      break;
+    case 'beaver':
+      title = 'Handmade Gift';
+      content = unpack ? '"I should visit and give this to him."' : '"A gift I handmade for my nephew."';
+      break;
+    default:
+      title = 'Unknown object';
+      content = '"Unknown object."';
+      break;
+  }
+
+  textBox.style.width = size;
+
+  // Create an image element and set its source
+  const image = document.createElement('img');
+  image.src = imageSrc;
+  image.style.width = '100%';
+  image.style.borderRadius = '5px';
+  image.style.marginBottom = '10px';
+
+  // Append title, image, and text content to the text box
+  const titleElement = document.createElement('h2');
+  titleElement.textContent = `${title}`;
+  titleElement.style.textAlign = 'center';
+  titleElement.style.marginBottom = '10px';
+  titleElement.style.fontSize = '30px';
+  titleElement.style.fontWeight = 'bold';
+
+  textBox.appendChild(titleElement);
+  textBox.appendChild(document.createTextNode(content));
+
+  document.body.appendChild(textBox);
+
+  function removeTextBox() {
+    textBox.remove();
+    document.removeEventListener('mousedown', removeTextBox);
+    document.removeEventListener('keydown', removeTextBox);
+  }
+
+  document.addEventListener('mousedown', removeTextBox);
+  document.addEventListener('keydown', removeTextBox);
+}
+
+
+
+
 
 function changeLighting(objectID) {
-  if (objectID === 'weirdSphere') {
-    // Adjust lighting for specific object
-    spotLight.intensity = 300;
-  } else if (objectID === 'cup' || objectID === 'trophy') {
-    // Adjust lighting for specific object
-    spotLight.intensity = Math.max(spotLight.intensity - 50, 0);
-    spotLight.color.setHex(0x0000ff); // Blue tint
+  if(unpack==false){
+    if (objectID === 'album'||objectID === 'beaver'||objectID === 'books') {
+      // Increase intensity and add yellow tint
+      spotLight.intensity += 100; // Increase brightness
+      mood+=170
+      spotLight.color.setHex(0xffff00); // Yellow tint
+    } else{
+      // Decrease intensity and add blue tint
+      spotLight.intensity = Math.max(spotLight.intensity - 200, 0); // Decrease brightness but not below 0
+      spotLight.color.setHex(0x0000ff); // Blue tint
+      mood-=100
+  
+    }
+  }else{
+    spotLight.intensity += 100; // Increase brightness
+      mood+=1000
+      spotLight.color.setHex(0xffff00); //yellow
   }
+
 }
 
+
 document.addEventListener('mousedown', onDocumentMouseDown, false);
+document.addEventListener('keydown', onDocumentKeyDown, false);
 
 function animate() {
   requestAnimationFrame(animate);
+  controls.update();
   renderer.render(scene, camera);
 }
 
